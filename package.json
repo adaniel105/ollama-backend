@@ -1,18 +1,20 @@
 {
   "name": "lmstudio-backend",
-  "module": "index.ts",
   "type": "module",
   "private": true,
-  "devDependencies": {
-    "@types/bun": "latest"
-  },
+  "main": "index.js",
   "peerDependencies": {
     "typescript": "^5"
+  },
+  "version": "1.0.0",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.15.1",
     "cohere-ai": "^7.19.0",
     "openai": "^6.8.1",
-    "pdf-lib": "^1.17.1"
+    "pdf-lib": "^1.17.1",
+    "node-poppler": "^8.0.5"
   }
 }
