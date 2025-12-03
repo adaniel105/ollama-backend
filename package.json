@@ -12,9 +12,14 @@
   },
   "dependencies": {
     "@qdrant/js-client-rest": "^1.15.1",
+    "cloudinary": "^2.8.0",
     "cohere-ai": "^7.19.0",
+    "dotenv": "^17.2.3",
+    "node-poppler": "^8.0.5",
     "openai": "^6.8.1",
-    "pdf-lib": "^1.17.1",
-    "node-poppler": "^8.0.5"
+    "pdf-lib": "^1.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1"
   }
 }
