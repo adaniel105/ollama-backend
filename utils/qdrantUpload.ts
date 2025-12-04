@@ -57,8 +57,9 @@ console.debug(embeds)
 // convert query to embeddings -> retrieve results from vector db (qdrant) -> output top_k responses
 const client = new QdrantClient({ host: "localhost", port: 6333 });
 
-// First, create collection if it doesn't exist
+
 const collectionName = "pdf_images";
+
 const vectorSize = embeds.float[0].length; // get dim size from first embed.
 console.log(vectorSize)
 try {
@@ -72,7 +73,6 @@ try {
   console.log("Collection may already exist, continuing...");
 }
 
-// Prepare points for upload
 const points = embeds.float.map((embedding, index) => ({
   id: index,
   vector: embedding,
