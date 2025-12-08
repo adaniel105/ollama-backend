@@ -87,3 +87,37 @@ await client.upsert(collectionName, {
 });
 
 console.log(`Successfully uploaded ${points.length} embeddings to Qdrant`);
+
+
+// SEMANTIC SEARCH FUNCTION
+async function searchImages(queryText: string, topK: number = 5) {
+
+  const queryResponse = await cohere.embed({
+    model: "embed-v4.0",
+    inputType: "search_query",
+    embeddingTypes: ["float"],
+    texts: [queryText],
+  });
+
+  const queryVector = queryResponse.embeddings.float[0];
+
+  // Search Qdrant
+  const searchResult = await client.search(collectionName, {
+    vector: queryVector,
+    limit: topK,
+  });
+
+  return searchResult;
+}
+
+
+const query = "a theory of numbers";
+const results = await searchImages(query, 3);
+
+console.log("\nSearch Results:");
+results.forEach((result, idx) => {
+  console.log(`\n${idx + 1}. Score: ${result.score}`);
+  console.log(`   File: ${result.payload.filename}`);
+  console.log(`   Path: ${result.payload.filepath}`);
+  console.log(`   Source PDF: ${result.payload.source_pdf}`);
+});
