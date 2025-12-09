@@ -6,7 +6,7 @@ import { QdrantClient } from '@qdrant/js-client-rest';
 
 import dotenv from "dotenv"
 // import { bulkRetrieveMetadata } from '../cloudinary/metadata.ts';
-import { readImgData } from './embed.js';
+import { readImgData } from './convertToB64.js';
 
 dotenv.config()
 const cohere = new CohereClientV2({});
@@ -23,20 +23,20 @@ const OUTPUT_FILES : string[] = OUTPUT_FILENAMES.map(name => path.join(OUTPUT_DI
 export const PDF_FILES: string[] = PDF_FILENAMES.map(name => path.join(INPUT_DIR, name));
 const IMG_DATA_ARRAY : string[] = []
 
-// const poppler = new Poppler();
-// const options = {
-// 	firstPageToConvert: 1,
-// 	lastPageToConvert: 2,
-// 	pngFile: true,
+const poppler = new Poppler();
+const options = {
+	firstPageToConvert: 1,
+	lastPageToConvert: 2,
+	pngFile: true,
 
-// };
+};
 
-// for (let file in PDF_FILES){
-//    //determine whether null coalescing is appropriate here later.
-//    let inputFile: string = PDF_FILES[file]!
-//    let inputFileName : string = inputFile.split(".")[0]?.split("/")[2]!
-//    poppler.pdfToCairo(inputFile, `${OUTPUT_DIR}/${inputFileName}`, options);
-// }
+for (let file in PDF_FILES){
+   //determine whether null coalescing is appropriate here later.
+   let inputFile: string = PDF_FILES[file]!
+   let inputFileName : string = inputFile.split(".")[0]?.split("/")[2]!
+   poppler.pdfToCairo(inputFile, `${OUTPUT_DIR}/${inputFileName}`, options);
+}
 
 readImgData(OUTPUT_DIR, IMG_DATA_ARRAY);
 
@@ -51,46 +51,48 @@ let response = await cohere.embed({
 
 let embeds = response.embeddings
 
-console.debug(embeds)
+// console.debug(embeds)
 
 // multimodal embeddings enable search over images directly. 
 // convert query to embeddings -> retrieve results from vector db (qdrant) -> output top_k responses
 const client = new QdrantClient({ host: "localhost", port: 6333 });
 
+async function qdrantUpload(collection: string ){
 
-const collectionName = "pdf_images";
-
-const vectorSize = embeds.float[0].length; // get dim size from first embed.
-console.log(vectorSize)
-try {
-  await client.createCollection(collectionName, {
-    vectors: {
-      size: vectorSize,
-      distance: "Cosine"
+  const vectorSize = embeds.float[0].length; // get dim size from first embed.
+  console.log(vectorSize)
+  try {
+    await client.createCollection(collection, {
+      vectors: {
+        size: vectorSize,
+        distance: "Cosine"
+      }
+    });
+  } catch (error) {
+    console.debug("Collection may already exist!");
+  }
+  
+  const points = embeds.float.map((embedding, index) => ({
+    id: index,
+    vector: embedding,
+    payload: {
+      filename: OUTPUT_FILENAMES[index],
     }
+  }));
+  
+  // Upload to Qdrant
+  await client.upsert(collection, {
+    points: points,
   });
-} catch (error) {
-  console.log("Collection may already exist, continuing...");
+  
+  console.log(`Successfully uploaded ${points.length} embeddings to Qdrant`);
+
 }
 
-const points = embeds.float.map((embedding, index) => ({
-  id: index,
-  vector: embedding,
-  payload: {
-    filename: OUTPUT_FILENAMES[index],
-  }
-}));
-
-// Upload to Qdrant
-await client.upsert(collectionName, {
-  points: points,
-});
-
-console.log(`Successfully uploaded ${points.length} embeddings to Qdrant`);
-
+// qdrantUpload("pdf-images")
 
 // SEMANTIC SEARCH FUNCTION
-async function searchImages(queryText: string, topK: number = 5) {
+export async function searchImages(collection: string, queryText: string, topK: number) {
 
   const queryResponse = await cohere.embed({
     model: "embed-v4.0",
@@ -98,11 +100,11 @@ async function searchImages(queryText: string, topK: number = 5) {
     embeddingTypes: ["float"],
     texts: [queryText],
   });
-
+  
   const queryVector = queryResponse.embeddings.float[0];
-
+  
   // Search Qdrant
-  const searchResult = await client.search(collectionName, {
+  const searchResult = await client.search(collection, {
     vector: queryVector,
     limit: topK,
   });
@@ -110,14 +112,10 @@ async function searchImages(queryText: string, topK: number = 5) {
   return searchResult;
 }
 
-
-const query = "a theory of numbers";
-const results = await searchImages(query, 3);
+const res = await searchImages("pdf-images", "keynote speaker govtech conference", 5)
 
 console.log("\nSearch Results:");
-results.forEach((result, idx) => {
+res.forEach((result, idx: number) => {
   console.log(`\n${idx + 1}. Score: ${result.score}`);
   console.log(`   File: ${result.payload.filename}`);
-  console.log(`   Path: ${result.payload.filepath}`);
-  console.log(`   Source PDF: ${result.payload.source_pdf}`);
 });
